@@ -2,14 +2,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const dropzone = document.getElementById("ptw-dropzone");
     const input = document.getElementById("ptw-input");
     const results = document.getElementById("ptw-results");
-    const preview = document.getElementById("ptw-preview");
     const formatSelect = document.getElementById("ptw-format");
     const widthInput = document.getElementById("ptw-width");
     const heightInput = document.getElementById("ptw-height");
     const qualityInput = document.getElementById("ptw-quality");
     const qualityValue = document.getElementById("ptw-quality-value");
 
-      qualityInput.addEventListener("input", () => {
+    qualityInput.addEventListener("input", () => {
         qualityValue.textContent = qualityInput.value;
     });
 
@@ -32,114 +31,67 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function handleFiles(files) {
         results.innerHTML = "";
-        preview.innerHTML = "";
 
         for (const file of files) {
             if (!file.type.startsWith("image/")) continue;
 
-            const img = document.createElement("img");
-            img.src = URL.createObjectURL(file);
-            img.style.maxWidth = "100px";
-            img.style.margin = "5px";
-            preview.appendChild(img);
-
-            const convertedBlob = await convertImage(img);
-            const newFormat = formatSelect.value;
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(convertedBlob);
-            link.download = file.name.replace(/\.[^.]+$/, `.${newFormat}`);
-            link.textContent = `⬇️ ${file.name.replace(/\.[^.]+$/, `.${newFormat}`)}`;
-            link.className = "ptw-download";
-            results.appendChild(link);
-        }
-    }
-
-    function convertImage(image) {
-        return new Promise((resolve) => {
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
+            const fileURL = URL.createObjectURL(file);
+            const originalSizeKB = (file.size / 1024).toFixed(1);
             const format = formatSelect.value;
+            const quality = parseFloat(qualityInput.value);
             const width = parseInt(widthInput.value);
             const height = parseInt(heightInput.value);
-            const quality = parseFloat(qualityInput.value);
-
-            image.onload = () => {
-                canvas.width = width || image.naturalWidth;
-                canvas.height = height || image.naturalHeight;
-                ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-                canvas.toBlob((blob) => resolve(blob), `image/${format}`, quality);
-            };
-        });
-    }
-
-    // Drag & Drop Events
-    dropzone.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        dropzone.classList.add("dragover");
-    });
-
-    dropzone.addEventListener("dragleave", () => {
-        dropzone.classList.remove("dragover");
-    });
-
-    dropzone.addEventListener("drop", (e) => {
-        e.preventDefault();
-        dropzone.classList.remove("dragover");
-        handleFiles(e.dataTransfer.files);
-    });
-
-    input.addEventListener("change", (e) => handleFiles(e.target.files));
-
-    async function handleFiles(files) {
-        results.innerHTML = "";
-        preview.innerHTML = "";
-
-        for (const file of files) {
-            if (file.type !== "image/png") continue;
-
-            const fileBox = document.createElement("div");
-            fileBox.className = "ptw-file";
-            fileBox.innerHTML = `<strong>${file.name}</strong><div class="ptw-progress"><div class="ptw-progress-bar"></div></div>`;
-            results.appendChild(fileBox);
 
             const img = document.createElement("img");
-            img.src = URL.createObjectURL(file);
-            img.style.maxWidth = "100px";
-            img.style.margin = "5px";
-            preview.appendChild(img);
+            img.src = fileURL;
 
-            const progressBar = fileBox.querySelector(".ptw-progress-bar");
-            let progress = 0;
+            const box = document.createElement("div");
+            box.className = "ptw-result-box";
+            results.appendChild(box);
 
-            const simulateProgress = setInterval(() => {
-                progress += 10;
-                progressBar.style.width = `${progress}%`;
-                if (progress >= 90) clearInterval(simulateProgress);
-            }, 100);
+            img.onload = async () => {
+                const convertedBlob = await convertImage(img, format, width, height, quality);
+                const newSizeKB = (convertedBlob.size / 1024).toFixed(1);
+                const savings = 100 - Math.round((newSizeKB / originalSizeKB) * 100);
 
-            const webpBlob = await convertToWebp(img);
-            progressBar.style.width = "100%";
+                const newImg = document.createElement("img");
+                newImg.src = URL.createObjectURL(convertedBlob);
 
-            const webpUrl = URL.createObjectURL(webpBlob);
-            const link = document.createElement("a");
-            link.href = webpUrl;
-            link.download = file.name.replace(".png", ".webp");
-            link.textContent = "⬇️ Download WEBP";
-            link.className = "ptw-download";
-            fileBox.appendChild(link);
+                box.innerHTML = `
+                    <div class="ptw-stats">
+                        <p><strong>${file.name}</strong></p>
+                        <p>Original: ${originalSizeKB} KB (${file.type.replace("image/","").toUpperCase()})</p>
+                        <p>Optimiert: ${newSizeKB} KB (${format.toUpperCase()})</p>
+                        <p class="ptw-saving">💡 Ersparnis: ${savings > 0 ? savings : 0}%</p>
+                    </div>
+                `;
+
+                const compare = document.createElement("div");
+                compare.className = "ptw-compare";
+                compare.appendChild(img);
+                compare.appendChild(newImg);
+                box.appendChild(compare);
+
+                const link = document.createElement("a");
+                link.href = newImg.src;
+                link.download = file.name.replace(/\.[^.]+$/, `.${format}`);
+                link.textContent = "⬇️ Download optimierte Version";
+                link.className = "ptw-download";
+                box.appendChild(link);
+            };
         }
     }
 
-    function convertToWebp(image) {
+    function convertImage(image, format, width, height, quality) {
         return new Promise((resolve) => {
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d");
-            image.onload = () => {
-                canvas.width = image.naturalWidth;
-                canvas.height = image.naturalHeight;
-                ctx.drawImage(image, 0, 0);
-                canvas.toBlob((blob) => resolve(blob), "image/webp", 0.9);
-            };
+
+            canvas.width = width || image.naturalWidth;
+            canvas.height = height || image.naturalHeight;
+
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => resolve(blob), `image/${format}`, quality);
         });
     }
 });

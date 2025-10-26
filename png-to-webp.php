@@ -2,8 +2,8 @@
 /*
 Plugin Name: Image Converter Pro
 Plugin URI: https://mrs-dev.com
-Description: Konvertiert PNG, JPG und WEBP Bilder im Browser – mit Optionen für Format, Größe und Qualität.
-Version: 1.3
+Description: Konvertiert PNG, JPG und WEBP Bilder im Browser – mit Format-, Größen- und Qualitätswahl + Vorher/Nachher-Vergleich.
+Version: 1.4
 Author: Raeed
 Author URI: https://mrs-dev.com
 License: GPL2
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
 // Scripts
 function ptw_enqueue_scripts() {
     wp_enqueue_style('ptw-style', plugin_dir_url(__FILE__) . 'assets/style.css');
-    wp_enqueue_script('ptw-script', plugin_dir_url(__FILE__) . 'assets/converter.js', array(), '1.3', true);
+    wp_enqueue_script('ptw-script', plugin_dir_url(__FILE__) . 'assets/converter.js', array(), '1.4', true);
 }
 add_action('wp_enqueue_scripts', 'ptw_enqueue_scripts');
 
@@ -23,7 +23,7 @@ function ptw_display_converter() {
     ob_start(); ?>
     <div class="ptw-container">
         <h2>🖼️ Image Converter Pro</h2>
-        <p>Wandle deine Bilder direkt im Browser um – wähle Format, Größe und Qualität.</p>
+        <p>Wandle deine Bilder direkt im Browser um – mit Vorher/Nachher-Vergleich und Qualitätsoptionen.</p>
 
         <div id="ptw-dropzone" class="ptw-dropzone">
             <p>📤 Dateien hierher ziehen oder auswählen</p>
@@ -47,7 +47,6 @@ function ptw_display_converter() {
             <span id="ptw-quality-value">0.9</span>
         </div>
 
-        <div id="ptw-preview"></div>
         <div id="ptw-results"></div>
     </div>
     <?php
