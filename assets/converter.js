@@ -3,6 +3,74 @@ document.addEventListener("DOMContentLoaded", () => {
     const input = document.getElementById("ptw-input");
     const results = document.getElementById("ptw-results");
     const preview = document.getElementById("ptw-preview");
+    const formatSelect = document.getElementById("ptw-format");
+    const widthInput = document.getElementById("ptw-width");
+    const heightInput = document.getElementById("ptw-height");
+    const qualityInput = document.getElementById("ptw-quality");
+    const qualityValue = document.getElementById("ptw-quality-value");
+
+      qualityInput.addEventListener("input", () => {
+        qualityValue.textContent = qualityInput.value;
+    });
+
+    dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+    });
+
+    dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("dragover");
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+        handleFiles(e.dataTransfer.files);
+    });
+
+    input.addEventListener("change", (e) => handleFiles(e.target.files));
+
+    async function handleFiles(files) {
+        results.innerHTML = "";
+        preview.innerHTML = "";
+
+        for (const file of files) {
+            if (!file.type.startsWith("image/")) continue;
+
+            const img = document.createElement("img");
+            img.src = URL.createObjectURL(file);
+            img.style.maxWidth = "100px";
+            img.style.margin = "5px";
+            preview.appendChild(img);
+
+            const convertedBlob = await convertImage(img);
+            const newFormat = formatSelect.value;
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(convertedBlob);
+            link.download = file.name.replace(/\.[^.]+$/, `.${newFormat}`);
+            link.textContent = `⬇️ ${file.name.replace(/\.[^.]+$/, `.${newFormat}`)}`;
+            link.className = "ptw-download";
+            results.appendChild(link);
+        }
+    }
+
+    function convertImage(image) {
+        return new Promise((resolve) => {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            const format = formatSelect.value;
+            const width = parseInt(widthInput.value);
+            const height = parseInt(heightInput.value);
+            const quality = parseFloat(qualityInput.value);
+
+            image.onload = () => {
+                canvas.width = width || image.naturalWidth;
+                canvas.height = height || image.naturalHeight;
+                ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob) => resolve(blob), `image/${format}`, quality);
+            };
+        });
+    }
 
     // Drag & Drop Events
     dropzone.addEventListener("dragover", (e) => {
