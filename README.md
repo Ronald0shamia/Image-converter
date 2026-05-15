@@ -1,28 +1,28 @@
-# 🖼️ Image Converter Pro
+# Image Converter Pro
 
-**Image Converter Pro** ist ein WordPress-Plugin, mit dem Besucher direkt auf deiner Webseite Bilder konvertieren können — schnell, sicher und komplett im Browser (ohne Server-Upload).  
-Es unterstützt **PNG, JPG, JPEG, WEBP** und bietet viele Optionen wie **Größe, Qualität, Wasserzeichen und Vorher/Nachher-Vergleich**.
+**Image Converter Pro** ist ein WordPress-Plugin, mit dem Besucher Bilder direkt auf deiner Webseite konvertieren koennen. Die Verarbeitung laeuft lokal im Browser, ohne Server-Upload.
 
----
+## Funktionen
 
-## 🚀 Funktionen
+- Drag & Drop Upload fuer Bilder
+- Unterstuetzung fuer PNG, JPG, JPEG und WEBP
+- Zielformat waehlen: WEBP, JPEG oder PNG
+- Qualitaet und Ausgabe-Groesse anpassen
+- Seitenverhaeltnis optional beibehalten
+- Vorher/Nachher-Vergleich mit Dateigroessenanzeige
+- Automatische Anzeige der moeglichen Ersparnis
+- Download der optimierten Version
 
-✅ **Drag & Drop Upload** – Nutzer können Bilder einfach per Drag & Drop hochladen  
-✅ **Mehrere Zielformate** – WEBP, JPG, PNG  
-✅ **Einstellbare Qualität & Größe**  
-✅ **Vorher/Nachher-Vergleich** mit Dateigrößenanzeige  
-✅ **Ersparnis in %** wird automatisch berechnet  
-✅ **Wasserzeichen-Funktion** *(optional, Text oder Bild)*  
-✅ **Läuft 100% im Browser** – keine Serverbelastung oder Uploads nötig  
+## Installation
 
----
-
-## 📦 Installation
-
-1. Lade den Plugin-Ordner `png-to-webp` als ZIP-Datei herunter  
-2. In WordPress → **Plugins → Installieren → Plugin hochladen**  
-3. Aktiviere **Image Converter Pro**  
-4. Füge den Shortcode auf einer beliebigen Seite ein:
+1. Lade den Plugin-Ordner als ZIP-Datei hoch.
+2. Aktiviere **Image Converter Pro** in WordPress unter **Plugins**.
+3. Fuege den Shortcode auf einer beliebigen Seite ein:
 
 ```php
 [image_converter]
+```
+
+## Hinweise
+
+Die Konvertierung nutzt die Canvas-Funktionen des Browsers. Deshalb koennen Ausgabeformat und Komprimierung je nach Browser leicht unterschiedlich ausfallen.

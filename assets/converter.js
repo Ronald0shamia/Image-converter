@@ -5,15 +5,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const formatSelect = document.getElementById("ptw-format");
     const widthInput = document.getElementById("ptw-width");
     const heightInput = document.getElementById("ptw-height");
+    const keepRatioInput = document.getElementById("ptw-keep-ratio");
     const qualityInput = document.getElementById("ptw-quality");
     const qualityValue = document.getElementById("ptw-quality-value");
 
+    if (!dropzone || !input || !results || !formatSelect || !widthInput || !heightInput || !qualityInput || !qualityValue) {
+        return;
+    }
+
     qualityInput.addEventListener("input", () => {
-        qualityValue.textContent = qualityInput.value;
+        qualityValue.textContent = `${Math.round(parseFloat(qualityInput.value) * 100)}%`;
     });
 
-    dropzone.addEventListener("dragover", (e) => {
-        e.preventDefault();
+    dropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
         dropzone.classList.add("dragover");
     });
 
@@ -21,77 +26,188 @@ document.addEventListener("DOMContentLoaded", () => {
         dropzone.classList.remove("dragover");
     });
 
-    dropzone.addEventListener("drop", (e) => {
-        e.preventDefault();
+    dropzone.addEventListener("drop", (event) => {
+        event.preventDefault();
         dropzone.classList.remove("dragover");
-        handleFiles(e.dataTransfer.files);
+        handleFiles(event.dataTransfer.files);
     });
 
-    input.addEventListener("change", (e) => handleFiles(e.target.files));
+    input.addEventListener("change", (event) => handleFiles(event.target.files));
 
     async function handleFiles(files) {
+        const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
         results.innerHTML = "";
 
-        for (const file of files) {
-            if (!file.type.startsWith("image/")) continue;
+        if (!imageFiles.length) {
+            results.appendChild(createErrorBox("Bitte waehle mindestens eine gueltige Bilddatei aus."));
+            return;
+        }
 
-            const fileURL = URL.createObjectURL(file);
-            const originalSizeKB = (file.size / 1024).toFixed(1);
-            const format = formatSelect.value;
-            const quality = parseFloat(qualityInput.value);
-            const width = parseInt(widthInput.value);
-            const height = parseInt(heightInput.value);
-
-            const img = document.createElement("img");
-            img.src = fileURL;
-
-            const box = document.createElement("div");
-            box.className = "ptw-result-box";
+        for (const file of imageFiles) {
+            const box = createLoadingBox(file.name);
             results.appendChild(box);
 
-            img.onload = async () => {
-                const convertedBlob = await convertImage(img, format, width, height, quality);
-                const newSizeKB = (convertedBlob.size / 1024).toFixed(1);
-                const savings = 100 - Math.round((newSizeKB / originalSizeKB) * 100);
+            try {
+                const originalUrl = URL.createObjectURL(file);
+                const originalImage = await loadImage(originalUrl);
+                const settings = getConversionSettings(originalImage);
+                const convertedBlob = await convertImage(originalImage, settings);
 
-                const newImg = document.createElement("img");
-                newImg.src = URL.createObjectURL(convertedBlob);
+                if (!convertedBlob) {
+                    throw new Error("Der Browser konnte dieses Bild nicht konvertieren.");
+                }
 
-                box.innerHTML = `
-                    <div class="ptw-stats">
-                        <p><strong>${file.name}</strong></p>
-                        <p>Original: ${originalSizeKB} KB (${file.type.replace("image/","").toUpperCase()})</p>
-                        <p>Optimiert: ${newSizeKB} KB (${format.toUpperCase()})</p>
-                        <p class="ptw-saving">💡 Ersparnis: ${savings > 0 ? savings : 0}%</p>
-                    </div>
-                `;
-
-                const compare = document.createElement("div");
-                compare.className = "ptw-compare";
-                compare.appendChild(img);
-                compare.appendChild(newImg);
-                box.appendChild(compare);
-
-                const link = document.createElement("a");
-                link.href = newImg.src;
-                link.download = file.name.replace(/\.[^.]+$/, `.${format}`);
-                link.textContent = "⬇️ Download optimierte Version";
-                link.className = "ptw-download";
-                box.appendChild(link);
-            };
+                const convertedUrl = URL.createObjectURL(convertedBlob);
+                renderResultBox(box, {
+                    file,
+                    originalUrl,
+                    convertedUrl,
+                    convertedBlob,
+                    format: settings.format,
+                    dimensions: settings.dimensions
+                });
+            } catch (error) {
+                box.className = "ptw-result-box is-error";
+                box.innerHTML = `<p class="ptw-error">${escapeHtml(file.name)} konnte nicht verarbeitet werden. ${escapeHtml(error.message)}</p>`;
+            }
         }
     }
 
-    function convertImage(image, format, width, height, quality) {
+    function createLoadingBox(fileName) {
+        const box = document.createElement("div");
+        box.className = "ptw-result-box is-loading";
+        box.innerHTML = `<p class="ptw-status">${escapeHtml(fileName)} wird konvertiert...</p>`;
+        return box;
+    }
+
+    function createErrorBox(message) {
+        const box = document.createElement("div");
+        box.className = "ptw-result-box is-error";
+        box.innerHTML = `<p class="ptw-error">${escapeHtml(message)}</p>`;
+        return box;
+    }
+
+    function getConversionSettings(image) {
+        const format = formatSelect.value;
+        const quality = parseFloat(qualityInput.value);
+        const requestedWidth = parseInt(widthInput.value, 10);
+        const requestedHeight = parseInt(heightInput.value, 10);
+        const keepRatio = keepRatioInput ? keepRatioInput.checked : true;
+        const dimensions = calculateDimensions(image.naturalWidth, image.naturalHeight, requestedWidth, requestedHeight, keepRatio);
+
+        return {
+            format,
+            quality,
+            dimensions
+        };
+    }
+
+    function calculateDimensions(originalWidth, originalHeight, requestedWidth, requestedHeight, keepRatio) {
+        const hasWidth = Number.isFinite(requestedWidth) && requestedWidth > 0;
+        const hasHeight = Number.isFinite(requestedHeight) && requestedHeight > 0;
+
+        if (!keepRatio) {
+            return {
+                width: hasWidth ? requestedWidth : originalWidth,
+                height: hasHeight ? requestedHeight : originalHeight
+            };
+        }
+
+        if (hasWidth && !hasHeight) {
+            return {
+                width: requestedWidth,
+                height: Math.max(1, Math.round((requestedWidth / originalWidth) * originalHeight))
+            };
+        }
+
+        if (!hasWidth && hasHeight) {
+            return {
+                width: Math.max(1, Math.round((requestedHeight / originalHeight) * originalWidth)),
+                height: requestedHeight
+            };
+        }
+
+        if (hasWidth && hasHeight) {
+            const ratio = Math.min(requestedWidth / originalWidth, requestedHeight / originalHeight);
+            return {
+                width: Math.max(1, Math.round(originalWidth * ratio)),
+                height: Math.max(1, Math.round(originalHeight * ratio))
+            };
+        }
+
+        return {
+            width: originalWidth,
+            height: originalHeight
+        };
+    }
+
+    function loadImage(src) {
+        return new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = () => reject(new Error("Die Datei konnte nicht als Bild geladen werden."));
+            image.src = src;
+        });
+    }
+
+    function convertImage(image, settings) {
         return new Promise((resolve) => {
             const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
+            const context = canvas.getContext("2d");
 
-            canvas.width = width || image.naturalWidth;
-            canvas.height = height || image.naturalHeight;
+            if (!context) {
+                resolve(null);
+                return;
+            }
 
-            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-            canvas.toBlob((blob) => resolve(blob), `image/${format}`, quality);
+            canvas.width = settings.dimensions.width;
+            canvas.height = settings.dimensions.height;
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => resolve(blob), `image/${settings.format}`, settings.quality);
         });
+    }
+
+    function renderResultBox(box, result) {
+        const originalSizeKB = result.file.size / 1024;
+        const convertedSizeKB = result.convertedBlob.size / 1024;
+        const savings = Math.max(0, Math.round(100 - ((convertedSizeKB / originalSizeKB) * 100)));
+        const outputName = result.file.name.replace(/\.[^.]+$/, `.${result.format}`);
+
+        box.className = "ptw-result-box";
+        box.innerHTML = `
+            <div class="ptw-stats">
+                <div class="ptw-file-name">${escapeHtml(result.file.name)}</div>
+                <div class="ptw-meta">Original: ${formatKB(originalSizeKB)} KB</div>
+                <div class="ptw-meta">Neu: ${formatKB(convertedSizeKB)} KB</div>
+                <div class="ptw-saving">Ersparnis: ${savings}%</div>
+            </div>
+            <div class="ptw-compare">
+                <div class="ptw-preview">
+                    <span>Original</span>
+                    <img src="${result.originalUrl}" alt="Originalbild ${escapeHtml(result.file.name)}">
+                </div>
+                <div class="ptw-preview">
+                    <span>${result.format.toUpperCase()} - ${result.dimensions.width} x ${result.dimensions.height}px</span>
+                    <img src="${result.convertedUrl}" alt="Konvertiertes Bild ${escapeHtml(result.file.name)}">
+                </div>
+            </div>
+            <div class="ptw-actions">
+                <a class="ptw-download" href="${result.convertedUrl}" download="${escapeHtml(outputName)}">Optimierte Version herunterladen</a>
+            </div>
+        `;
+    }
+
+    function formatKB(value) {
+        return value.toFixed(value >= 100 ? 0 : 1);
+    }
+
+    function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (character) => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            "\"": "&quot;",
+            "'": "&#039;"
+        }[character]));
     }
 });
