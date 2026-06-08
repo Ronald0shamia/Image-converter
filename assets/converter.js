@@ -7,15 +7,37 @@ document.addEventListener("DOMContentLoaded", () => {
     const heightInput = document.getElementById("ptw-height");
     const keepRatioInput = document.getElementById("ptw-keep-ratio");
     const removeBgInput = document.getElementById("ptw-remove-bg");
+    const applyButton = document.getElementById("ptw-apply");
     const qualityInput = document.getElementById("ptw-quality");
     const qualityValue = document.getElementById("ptw-quality-value");
+    const entries = [];
 
-    if (!dropzone || !input || !results || !formatSelect || !widthInput || !heightInput || !qualityInput || !qualityValue) {
+    if (!dropzone || !input || !results || !formatSelect || !widthInput || !heightInput || !qualityInput || !qualityValue || !applyButton) {
         return;
     }
 
     qualityInput.addEventListener("input", () => {
         qualityValue.textContent = `${Math.round(parseFloat(qualityInput.value) * 100)}%`;
+        markEntriesStale();
+    });
+
+    applyButton.addEventListener("click", () => {
+        applySettingsToEntries();
+    });
+
+    [formatSelect, widthInput, heightInput, keepRatioInput, removeBgInput].forEach((control) => {
+        if (control) {
+            control.addEventListener("input", markEntriesStale);
+            control.addEventListener("change", markEntriesStale);
+        }
+    });
+
+    results.addEventListener("click", (event) => {
+        const download = event.target.closest(".ptw-download");
+
+        if (download && download.classList.contains("is-disabled")) {
+            event.preventDefault();
+        }
     });
 
     dropzone.addEventListener("dragover", (event) => {
@@ -37,7 +59,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function handleFiles(files) {
         const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
+        entries.length = 0;
         results.innerHTML = "";
+        applyButton.disabled = true;
 
         if (!imageFiles.length) {
             results.appendChild(createErrorBox("Bitte waehle mindestens eine gueltige Bilddatei aus."));
@@ -51,28 +75,96 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 const originalUrl = URL.createObjectURL(file);
                 const originalImage = await loadImage(originalUrl);
-                const settings = getConversionSettings(originalImage);
-                const convertedBlob = await convertImage(originalImage, settings);
-
-                if (!convertedBlob) {
-                    throw new Error("Der Browser konnte dieses Bild nicht konvertieren.");
-                }
-
-                const convertedUrl = URL.createObjectURL(convertedBlob);
-                renderResultBox(box, {
+                const entry = {
                     file,
                     originalUrl,
-                    convertedUrl,
-                    convertedBlob,
-                    format: settings.format,
-                    dimensions: settings.dimensions,
-                    changedFormatForTransparency: settings.changedFormatForTransparency
-                });
+                    originalImage,
+                    convertedUrl: "",
+                    isStale: false,
+                    box
+                };
+
+                entries.push(entry);
+                await renderConvertedEntry(entry);
             } catch (error) {
                 box.className = "ptw-result-box is-error";
                 box.innerHTML = `<p class="ptw-error">${escapeHtml(file.name)} konnte nicht verarbeitet werden. ${escapeHtml(error.message)}</p>`;
             }
         }
+
+        applyButton.disabled = entries.length === 0;
+    }
+
+    async function applySettingsToEntries() {
+        if (!entries.length || applyButton.disabled) {
+            return;
+        }
+
+        applyButton.disabled = true;
+        applyButton.textContent = "Wird uebernommen...";
+
+        for (const entry of entries) {
+            entry.box.className = "ptw-result-box is-loading";
+            entry.box.innerHTML = `<p class="ptw-status">${escapeHtml(entry.file.name)} wird mit den neuen Einstellungen verarbeitet...</p>`;
+            await renderConvertedEntry(entry);
+        }
+
+        applyButton.textContent = "Aenderungen uebernehmen";
+        applyButton.disabled = false;
+    }
+
+    async function renderConvertedEntry(entry) {
+        const settings = getConversionSettings(entry.originalImage);
+        const convertedBlob = await convertImage(entry.originalImage, settings);
+
+        if (!convertedBlob) {
+            throw new Error("Der Browser konnte dieses Bild nicht konvertieren.");
+        }
+
+        if (entry.convertedUrl) {
+            URL.revokeObjectURL(entry.convertedUrl);
+        }
+
+        entry.convertedUrl = URL.createObjectURL(convertedBlob);
+        entry.isStale = false;
+
+        renderResultBox(entry.box, {
+            file: entry.file,
+            originalUrl: entry.originalUrl,
+            convertedUrl: entry.convertedUrl,
+            convertedBlob,
+            format: settings.format,
+            dimensions: settings.dimensions,
+            removeBackground: settings.removeBackground,
+            changedFormatForTransparency: settings.changedFormatForTransparency
+        });
+    }
+
+    function markEntriesStale() {
+        for (const entry of entries) {
+            entry.isStale = true;
+            updateEntryStaleState(entry);
+        }
+    }
+
+    function updateEntryStaleState(entry) {
+        const status = entry.box.querySelector(".ptw-applied");
+        const download = entry.box.querySelector(".ptw-download");
+
+        if (!status || !download) {
+            return;
+        }
+
+        if (entry.isStale) {
+            status.textContent = "Aenderungen noch nicht uebernommen.";
+            download.classList.add("is-disabled");
+            download.setAttribute("aria-disabled", "true");
+            return;
+        }
+
+        status.textContent = "Aktuelle Einstellungen wurden uebernommen.";
+        download.classList.remove("is-disabled");
+        download.removeAttribute("aria-disabled");
     }
 
     function createLoadingBox(fileName) {
@@ -159,7 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function convertImage(image, settings) {
         return new Promise((resolve) => {
             const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d");
+            const context = canvas.getContext("2d", { willReadFrequently: settings.removeBackground });
 
             if (!context) {
                 resolve(null);
@@ -182,21 +274,50 @@ document.addEventListener("DOMContentLoaded", () => {
         const imageData = context.getImageData(0, 0, width, height);
         const data = imageData.data;
         const background = getEstimatedBackgroundColor(data, width, height);
-        const tolerance = 54;
-        const fadeRange = 28;
+        const visited = new Uint8Array(width * height);
+        const queue = [];
+        const tolerance = 72;
+        const edgeSoftness = 30;
 
-        for (let index = 0; index < data.length; index += 4) {
-            const distance = colorDistance(data[index], data[index + 1], data[index + 2], background);
+        addEdgeSeeds(queue, width, height);
 
-            if (distance <= tolerance) {
-                data[index + 3] = 0;
-            } else if (distance <= tolerance + fadeRange) {
-                const alphaRatio = (distance - tolerance) / fadeRange;
-                data[index + 3] = Math.round(data[index + 3] * alphaRatio);
+        for (let pointer = 0; pointer < queue.length; pointer += 1) {
+            const pixel = queue[pointer];
+
+            if (pixel < 0 || pixel >= visited.length || visited[pixel]) {
+                continue;
             }
+
+            const dataIndex = pixel * 4;
+            const distance = colorDistance(data[dataIndex], data[dataIndex + 1], data[dataIndex + 2], background);
+
+            if (distance > tolerance + edgeSoftness) {
+                continue;
+            }
+
+            visited[pixel] = 1;
+            data[dataIndex + 3] = distance <= tolerance ? 0 : Math.round(data[dataIndex + 3] * ((distance - tolerance) / edgeSoftness));
+
+            const x = pixel % width;
+            if (x > 0) queue.push(pixel - 1);
+            if (x < width - 1) queue.push(pixel + 1);
+            if (pixel >= width) queue.push(pixel - width);
+            if (pixel < visited.length - width) queue.push(pixel + width);
         }
 
         context.putImageData(imageData, 0, 0);
+    }
+
+    function addEdgeSeeds(queue, width, height) {
+        for (let x = 0; x < width; x += 1) {
+            queue.push(x);
+            queue.push(((height - 1) * width) + x);
+        }
+
+        for (let y = 1; y < height - 1; y += 1) {
+            queue.push(y * width);
+            queue.push((y * width) + width - 1);
+        }
     }
 
     function getEstimatedBackgroundColor(data, width, height) {
@@ -222,7 +343,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         for (const color of colorGroups) {
-            color.matches = colorGroups.filter((candidate) => colorDistance(candidate.r, candidate.g, candidate.b, color) < 36).length;
+            color.matches = colorGroups.filter((candidate) => colorDistance(candidate.r, candidate.g, candidate.b, color) < 42).length;
         }
 
         colorGroups.sort((a, b) => b.matches - a.matches);
@@ -262,6 +383,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
             </div>
             <div class="ptw-actions">
+                <span class="ptw-applied">Aktuelle Einstellungen wurden uebernommen.</span>
                 <a class="ptw-download" href="${result.convertedUrl}" download="${escapeHtml(outputName)}">Optimierte Version herunterladen</a>
             </div>
         `;
@@ -269,7 +391,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function getResultLabel(result) {
         const transparencyNote = result.changedFormatForTransparency ? " - PNG fuer Transparenz" : "";
-        return `${result.format.toUpperCase()} - ${result.dimensions.width} x ${result.dimensions.height}px${transparencyNote}`;
+        const backgroundNote = result.removeBackground ? " - Hintergrund entfernt" : "";
+        return `${result.format.toUpperCase()} - ${result.dimensions.width} x ${result.dimensions.height}px${transparencyNote}${backgroundNote}`;
     }
 
     function formatKB(value) {

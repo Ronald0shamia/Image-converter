@@ -69,6 +69,8 @@ function ptw_display_converter() {
                 <label for="ptw-quality">Qualitaet <span id="ptw-quality-value">90%</span></label>
                 <input type="range" id="ptw-quality" min="0.1" max="1" step="0.1" value="0.9">
             </div>
+
+            <button type="button" id="ptw-apply" class="ptw-apply" disabled>Aenderungen uebernehmen</button>
         </div>
 
         <div id="ptw-results" class="ptw-results" aria-live="polite"></div>

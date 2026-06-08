@@ -179,6 +179,30 @@
     width: 18px;
 }
 
+.ptw-apply {
+    align-self: end;
+    background: var(--ptw-primary);
+    border: 0;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 800;
+    min-height: 42px;
+    padding: 10px 14px;
+    transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.ptw-apply:hover,
+.ptw-apply:focus {
+    background: var(--ptw-primary-dark);
+}
+
+.ptw-apply:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
 .ptw-results {
     display: grid;
     gap: 18px;
@@ -270,10 +294,18 @@
 }
 
 .ptw-actions {
+    align-items: center;
     border-top: 1px solid var(--ptw-border);
     display: flex;
+    gap: 12px;
     justify-content: flex-end;
     padding: 14px 16px;
+}
+
+.ptw-applied {
+    color: var(--ptw-muted);
+    font-size: 13px;
+    margin-right: auto;
 }
 
 .ptw-download {
@@ -293,6 +325,13 @@
 .ptw-download:focus {
     background: var(--ptw-primary-dark);
     color: #fff;
+}
+
+.ptw-download.is-disabled {
+    background: #8a98a8;
+    cursor: not-allowed;
+    opacity: 0.7;
+    pointer-events: auto;
 }
 
 @media (max-width: 760px) {
@@ -332,7 +371,13 @@
     }
 
     .ptw-actions {
+        align-items: stretch;
+        flex-direction: column;
         justify-content: stretch;
+    }
+
+    .ptw-applied {
+        margin-right: 0;
     }
 
     .ptw-download {
