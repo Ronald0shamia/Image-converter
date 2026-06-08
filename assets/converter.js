@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const widthInput = document.getElementById("ptw-width");
     const heightInput = document.getElementById("ptw-height");
     const keepRatioInput = document.getElementById("ptw-keep-ratio");
+    const removeBgInput = document.getElementById("ptw-remove-bg");
     const qualityInput = document.getElementById("ptw-quality");
     const qualityValue = document.getElementById("ptw-quality-value");
 
@@ -64,7 +65,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     convertedUrl,
                     convertedBlob,
                     format: settings.format,
-                    dimensions: settings.dimensions
+                    dimensions: settings.dimensions,
+                    changedFormatForTransparency: settings.changedFormatForTransparency
                 });
             } catch (error) {
                 box.className = "ptw-result-box is-error";
@@ -88,7 +90,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function getConversionSettings(image) {
-        const format = formatSelect.value;
+        const removeBackground = removeBgInput ? removeBgInput.checked : false;
+        const selectedFormat = formatSelect.value;
+        const format = removeBackground && selectedFormat === "jpeg" ? "png" : selectedFormat;
         const quality = parseFloat(qualityInput.value);
         const requestedWidth = parseInt(widthInput.value, 10);
         const requestedHeight = parseInt(heightInput.value, 10);
@@ -98,7 +102,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return {
             format,
             quality,
-            dimensions
+            dimensions,
+            removeBackground,
+            changedFormatForTransparency: removeBackground && selectedFormat !== format
         };
     }
 
@@ -163,8 +169,72 @@ document.addEventListener("DOMContentLoaded", () => {
             canvas.width = settings.dimensions.width;
             canvas.height = settings.dimensions.height;
             context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+            if (settings.removeBackground) {
+                removeImageBackground(context, canvas.width, canvas.height);
+            }
+
             canvas.toBlob((blob) => resolve(blob), `image/${settings.format}`, settings.quality);
         });
+    }
+
+    function removeImageBackground(context, width, height) {
+        const imageData = context.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        const background = getEstimatedBackgroundColor(data, width, height);
+        const tolerance = 54;
+        const fadeRange = 28;
+
+        for (let index = 0; index < data.length; index += 4) {
+            const distance = colorDistance(data[index], data[index + 1], data[index + 2], background);
+
+            if (distance <= tolerance) {
+                data[index + 3] = 0;
+            } else if (distance <= tolerance + fadeRange) {
+                const alphaRatio = (distance - tolerance) / fadeRange;
+                data[index + 3] = Math.round(data[index + 3] * alphaRatio);
+            }
+        }
+
+        context.putImageData(imageData, 0, 0);
+    }
+
+    function getEstimatedBackgroundColor(data, width, height) {
+        const samplePoints = [
+            [0, 0],
+            [width - 1, 0],
+            [0, height - 1],
+            [width - 1, height - 1],
+            [Math.floor(width / 2), 0],
+            [Math.floor(width / 2), height - 1],
+            [0, Math.floor(height / 2)],
+            [width - 1, Math.floor(height / 2)]
+        ];
+
+        const colorGroups = samplePoints.map(([x, y]) => {
+            const index = ((y * width) + x) * 4;
+            return {
+                r: data[index],
+                g: data[index + 1],
+                b: data[index + 2],
+                matches: 0
+            };
+        });
+
+        for (const color of colorGroups) {
+            color.matches = colorGroups.filter((candidate) => colorDistance(candidate.r, candidate.g, candidate.b, color) < 36).length;
+        }
+
+        colorGroups.sort((a, b) => b.matches - a.matches);
+        return colorGroups[0];
+    }
+
+    function colorDistance(red, green, blue, target) {
+        return Math.sqrt(
+            ((red - target.r) ** 2) +
+            ((green - target.g) ** 2) +
+            ((blue - target.b) ** 2)
+        );
     }
 
     function renderResultBox(box, result) {
@@ -187,7 +257,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <img src="${result.originalUrl}" alt="Originalbild ${escapeHtml(result.file.name)}">
                 </div>
                 <div class="ptw-preview">
-                    <span>${result.format.toUpperCase()} - ${result.dimensions.width} x ${result.dimensions.height}px</span>
+                    <span>${getResultLabel(result)}</span>
                     <img src="${result.convertedUrl}" alt="Konvertiertes Bild ${escapeHtml(result.file.name)}">
                 </div>
             </div>
@@ -195,6 +265,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 <a class="ptw-download" href="${result.convertedUrl}" download="${escapeHtml(outputName)}">Optimierte Version herunterladen</a>
             </div>
         `;
+    }
+
+    function getResultLabel(result) {
+        const transparencyNote = result.changedFormatForTransparency ? " - PNG fuer Transparenz" : "";
+        return `${result.format.toUpperCase()} - ${result.dimensions.width} x ${result.dimensions.height}px${transparencyNote}`;
     }
 
     function formatKB(value) {

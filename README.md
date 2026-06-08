@@ -9,6 +9,7 @@
 - Zielformat waehlen: WEBP, JPEG oder PNG
 - Qualitaet und Ausgabe-Groesse anpassen
 - Seitenverhaeltnis optional beibehalten
+- Hintergrund bei einfachen, einfarbigen Motiven automatisch entfernen
 - Vorher/Nachher-Vergleich mit Dateigroessenanzeige
 - Automatische Anzeige der moeglichen Ersparnis
 - Download der optimierten Version

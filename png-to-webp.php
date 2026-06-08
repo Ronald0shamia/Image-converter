@@ -60,6 +60,11 @@ function ptw_display_converter() {
                 <span>Seitenverhaeltnis halten</span>
             </label>
 
+            <label class="ptw-checkbox">
+                <input type="checkbox" id="ptw-remove-bg">
+                <span>Hintergrund entfernen</span>
+            </label>
+
             <div class="ptw-field ptw-field-quality">
                 <label for="ptw-quality">Qualitaet <span id="ptw-quality-value">90%</span></label>
                 <input type="range" id="ptw-quality" min="0.1" max="1" step="0.1" value="0.9">
