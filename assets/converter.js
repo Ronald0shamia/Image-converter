@@ -184,7 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function getConversionSettings(image) {
         const removeBackground = removeBgInput ? removeBgInput.checked : false;
         const selectedFormat = formatSelect.value;
-        const format = removeBackground && selectedFormat === "jpeg" ? "png" : selectedFormat;
+        const format = removeBackground ? "png" : selectedFormat;
         const quality = parseFloat(qualityInput.value);
         const requestedWidth = parseInt(widthInput.value, 10);
         const requestedHeight = parseInt(heightInput.value, 10);
@@ -379,7 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <div class="ptw-preview">
                     <span>${getResultLabel(result)}</span>
-                    <img src="${result.convertedUrl}" alt="Konvertiertes Bild ${escapeHtml(result.file.name)}">
+                    <img class="${result.removeBackground ? "ptw-transparent-preview" : ""}" src="${result.convertedUrl}" alt="Konvertiertes Bild ${escapeHtml(result.file.name)}">
                 </div>
             </div>
             <div class="ptw-actions">

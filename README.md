@@ -1,5 +1,7 @@
 # Image Converter Pro
 
+Version: 1.5.0
+
 **Image Converter Pro** ist ein WordPress-Plugin, mit dem Besucher Bilder direkt auf deiner Webseite konvertieren koennen. Die Verarbeitung laeuft lokal im Browser, ohne Server-Upload.
 
 ## Funktionen

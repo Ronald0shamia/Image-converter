@@ -3,7 +3,7 @@
 Plugin Name: Image Converter Pro
 Plugin URI: https://mrs-dev.com
 Description: Konvertiert PNG, JPG und WEBP Bilder direkt im Browser - mit Format-, Groessen- und Qualitaetswahl plus Vorher/Nachher-Vergleich.
-Version: 1.4
+Version: 1.5.0
 Author: Raeed
 Author URI: https://mrs-dev.com
 License: GPL2
@@ -11,10 +11,17 @@ License: GPL2
 
 if (!defined('ABSPATH')) exit;
 
+define('PTW_VERSION', '1.5.0');
+
 // Scripts
 function ptw_enqueue_scripts() {
-    wp_enqueue_style('ptw-style', plugin_dir_url(__FILE__) . 'assets/style.css', array(), '1.4');
-    wp_enqueue_script('ptw-script', plugin_dir_url(__FILE__) . 'assets/converter.js', array(), '1.4', true);
+    $style_path = plugin_dir_path(__FILE__) . 'assets/style.css';
+    $script_path = plugin_dir_path(__FILE__) . 'assets/converter.js';
+    $style_version = file_exists($style_path) ? filemtime($style_path) : PTW_VERSION;
+    $script_version = file_exists($script_path) ? filemtime($script_path) : PTW_VERSION;
+
+    wp_enqueue_style('ptw-style', plugin_dir_url(__FILE__) . 'assets/style.css', array(), $style_version);
+    wp_enqueue_script('ptw-script', plugin_dir_url(__FILE__) . 'assets/converter.js', array(), $script_version, true);
 }
 add_action('wp_enqueue_scripts', 'ptw_enqueue_scripts');
 
